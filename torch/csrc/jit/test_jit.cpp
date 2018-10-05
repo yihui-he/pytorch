@@ -39,6 +39,7 @@ using Catch::StartsWith;
 #include "torch/csrc/jit/graph_executor.h"
 #include "torch/csrc/jit/script/compiler.h"
 #include "torch/csrc/jit/script/module.h"
+#include "torch/csrc/jit/script/parser.h"
 #include "torch/csrc/jit/ivalue.h"
 
 #include "onnx/onnx_pb.h"
@@ -103,6 +104,18 @@ int commatest(int a, things..., others)
 int notest(int a)
 )";
 
+static auto foo = R"(
+graph(%0 : Double(2),
+      %1 : Double(2)):
+  %2 : int = prim::Constant[value=1]()
+  %3 : Double(2) = aten::add(%0, %1, %2)
+  %4 : Double(2) = aten::mul(%3, %3)
+  %5 : Double(2) = aten::mul(%4, %3)
+  %6 : Double(2) = aten::tanh(%5)
+  %7 : Double(2) = aten::add(%6, %6, %2)
+  %8 : Double(2) = aten::add(%5, %7, %2)
+  return (%8)
+)";
 static void codeTemplateTest() {
   {
     TemplateEnv e;
@@ -872,6 +885,11 @@ void testProto() {
   proto.set_producer_name("foo");
 }
 
+void testIRParser() {
+  script::IRParser parser{foo};
+  auto foo = parser.parseGraph();
+}
+
 void testCustomOperators() {
   {
     RegisterOperators reg({createOperator(
@@ -1088,6 +1106,7 @@ TORCH_API std::string runJITCPPTests() {
   argumentSpecTest();
   testProto();
   testCustomOperators();
+  testIRParser();
   return out.str();
 }
 
@@ -1116,6 +1135,8 @@ CATCH_TEST_CASE( "jit test CPU", "[cpu]" ) {
     internedStringsTests();
   CATCH_SECTION( "custom operators" )
     testCustomOperators();
+  CATCH_SECTION( "IR parser" )
+    testIRParser();
 }
 
 CATCH_TEST_CASE( "jit test CUDA", "[cuda]" ) {

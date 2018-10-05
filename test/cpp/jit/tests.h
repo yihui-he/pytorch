@@ -48,6 +48,7 @@
 #include "torch/csrc/jit/ivalue.h"
 #include "torch/csrc/jit/script/compiler.h"
 #include "torch/csrc/jit/script/module.h"
+#include "torch/csrc/jit/script/parser.h"
 
 #include "onnx/onnx_pb.h"
 
@@ -110,6 +111,26 @@ int foo(hi, 8) {
 }
 int commatest(int a, things..., others)
 int notest(int a)
+)";
+
+auto foo = R"(
+graph(%a : Dynamic,
+      %b : Dynamic,
+      %c : Dynamic):
+  %2 : int = prim::Constant[value=1]()
+  %3 : Dynamic = aten::add(%a, %b, %2)
+  %5 : Dynamic = prim::If(%c)
+    block0():
+      %8 : int = prim::Constant[value=1]()
+      %9 : Dynamic = aten::add(%b, %3, %8)
+      %10 : int = prim::Constant[value=1]()
+      %11 : Dynamic = aten::add(%9, %3, %10)
+      -> (%11)
+  %12 : int = prim::Constant[value=1]()
+  %13 : Dynamic = aten::add(%5, %3, %12)
+  return (%13)
+)";
+auto foo2 = R"(
 )";
 
 void testCodeTemplate() {
@@ -921,6 +942,26 @@ void testProto() {
   ::ONNX_NAMESPACE::ModelProto proto;
   proto.set_producer_name("foo");
 }
+
+void testIRParser() {
+  script::IRParser parser{foo};
+  auto foo = parser.parseGraph();
+  std::stringstream stm;
+  stm << *foo;
+  const auto f2 = stm.str();
+  script::IRParser parser2{f2};
+  auto f3 = parser2.parseGraph();
+
+  std::stringstream stm2;
+  stm2 << *f3;
+  const auto foo2 = stm2.str();
+
+  ASSERT_EQ(f2, foo2);
+
+  // script::IRParser parser2{foo2};
+  // auto foo2 = parser2.parseGraph();
+}
+
 
 void testCustomOperators() {
   {

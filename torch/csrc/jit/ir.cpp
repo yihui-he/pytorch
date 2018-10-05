@@ -68,7 +68,7 @@ std::ostream& operator<<(std::ostream & out, const_value_list_with_types l) {
     if(i++ > 0) {
       if (l.use_newlines) {
         // TODO: Indent here is hard-coded for "graph(": un-hard-code it
-        out << "\n      ";
+        out << ",\n      ";
       } else {
         out << ", ";
       }
@@ -138,12 +138,11 @@ std::ostream& printNode(std::ostream & out, size_t level, const Node * n, std::v
   }
   for(size_t i = 0; i < n->blocks().size(); ++i) {
     auto b = n->blocks()[i];
-    indent(out, level + 1) << "block" << i << "(" << const_value_list_with_types(b->inputs(), false) << ") {\n";
+    indent(out, level + 1) << "block" << i << "(" << const_value_list_with_types(b->inputs(), false) << "):\n";
     for(auto n : b->nodes()) {
       printNode(out, level + 2, n, groups);
     }
     indent(out, level + 2) << "-> (" << b->outputs() << ")\n";
-    indent(out, level + 1) << "}\n";
   }
   return out;
 }
@@ -153,12 +152,12 @@ std::ostream& operator<<(std::ostream & out, const Node & n) {
 }
 
 std::ostream& operator<<(std::ostream & out, const Graph & g) {
-  out << "graph(" << const_value_list_with_types(g.inputs(), true) << ") {\n";
+  out << "graph(" << const_value_list_with_types(g.inputs(), true) << "):\n";
   std::vector<const Node*> groups;
   for(auto n : g.nodes()) {
     printNode(out, 1, n, &groups);
   }
-  out << "  return (" << g.outputs() << ");\n}\n";
+  out << "  return (" << g.outputs() << ")\n";
   size_t i = 0;
   for(auto fg : groups) {
     out << "with " << fg->kind().toQualString() << "_" <<i++ << " = " << *fg->g(attr::Subgraph);

@@ -83,7 +83,8 @@ namespace script {
   _(TK_ARROW, "arrow", "->")                     \
   _(TK_DECL, "decl", "")                         \
   _(TK_SLICE_EXPR, "slice expr", "")             \
-  _(TK_TYPE_COMMENT, "type comment", "# type:")
+  _(TK_TYPE_COMMENT, "type comment", "# type:")  \
+  _(TK_GRAPH, "graph decl", "graph")             \
 
 static const char* valid_single_char_tokens = "+-*/%@()[]:,={}><.?";
 
@@ -332,7 +333,7 @@ struct Token {
   int kind;
   SourceRange range;
   Token(int kind, const SourceRange& range) : kind(kind), range(range) {}
-  std::string text() {
+  std::string text() const {
     return range.text();
   }
   std::string kindString() const {
