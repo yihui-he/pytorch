@@ -164,6 +164,7 @@ build_env_vars = ['BINARY', 'TEST', 'CAFFE2_OPS']
 [hotpatch_var(v, 'BUILD_') for v in build_env_vars]
 
 from tools.setup_helpers.cuda import USE_CUDA, CUDA_HOME, CUDA_VERSION
+CUDA_HOME='/usr/local/cuda-9.0'
 from tools.setup_helpers.build import (BUILD_BINARY, BUILD_TEST,
                                        BUILD_CAFFE2_OPS, USE_LEVELDB,
                                        USE_LMDB, USE_OPENCV, USE_FFMPEG)

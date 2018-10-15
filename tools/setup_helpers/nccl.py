@@ -75,5 +75,5 @@ if USE_CUDA and not check_negative_env_flag('USE_SYSTEM_NCCL'):
             NCCL_INCLUDE_DIR = path
             break
     if NCCL_LIB_DIR is not None and NCCL_INCLUDE_DIR is not None:
-        USE_SYSTEM_NCCL = True
+        USE_SYSTEM_NCCL = False
         NCCL_ROOT_DIR = os.path.commonprefix((NCCL_LIB_DIR, NCCL_INCLUDE_DIR))
