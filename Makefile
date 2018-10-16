@@ -13,7 +13,7 @@ ios:
 	@./scripts/build_ios.sh
 
 clean: # This will remove ALL build folders.
-	@rm -r build*/
+	@rm -r build*/ && git clean -xfd
 
 linecount:
 	@cloc --read-lang-def=caffe.cloc caffe2 || \
