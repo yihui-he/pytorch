@@ -578,6 +578,18 @@ avg_pool3d = _avg_pool('avg_pool3d', _triple)
 
 
 @parse_args('v', 'is')
+def adaptive_avg_pool2d(g, input, output_size):
+    assert output_size == [1, 1], "Only output_size=[1, 1] is supported"
+    return g.op("GlobalAveragePool", input)
+
+
+@parse_args('v', 'is')
+def adaptive_max_pool2d(g, input, output_size):
+    assert output_size == [1, 1], "Only output_size=[1, 1] is supported"
+    return g.op("GlobalMaxPool", input), None
+
+
+@parse_args('v', 'is')
 def reflection_pad(g, input, padding):
     from torch.autograd._functions.utils import prepare_onnx_paddings
     mode = "reflect"
@@ -618,7 +630,7 @@ def upsample_bilinear2d(g, input, output_size, align_corners):
     width_scale = float(output_size[-1]) / input.type().sizes()[-1]
     return g.op("Upsample", input,
                 scales_f=[1., 1., height_scale, width_scale],
-                mode_s="bilinear")
+                mode_s="linear")
 
 
 def gt(g, input, other):
