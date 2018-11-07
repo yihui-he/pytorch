@@ -3,7 +3,7 @@
 #include <torch/nn/module.h>
 #include <torch/nn/modules/linear.h>
 #include <torch/nn/modules/rnn.h>
-#include <torch/tensor.h>
+#include <torch/types.h>
 #include <torch/utils.h>
 
 #include <test/cpp/api/support.h>
@@ -54,8 +54,8 @@ TEST_F(ModuleTest, ZeroGrad) {
 TEST_F(ModuleTest, ZeroGradWithUndefined) {
   struct TestModule : torch::nn::Module {
     TestModule() {
-      x = register_parameter("x", torch::ones(5, at::requires_grad()));
-      y = register_parameter("y", torch::ones(5, at::requires_grad()));
+      x = register_parameter("x", torch::ones(5, torch::requires_grad()));
+      y = register_parameter("y", torch::ones(5, torch::requires_grad()));
     }
     torch::Tensor x, y;
   };
@@ -73,6 +73,74 @@ TEST_F(ModuleTest, ZeroGradWithUndefined) {
   ASSERT_FALSE(module.y.grad().defined());
 
   ASSERT_EQ(module.x.grad().sum().item<float>(), 0);
+}
+
+TEST_F(ModuleTest, RegisterModuleThrowsForEmptyOrDottedName) {
+  struct TestModel : public torch::nn::Module {
+    using torch::nn::Module::register_module;
+  };
+  ASSERT_THROWS_WITH(
+      TestModel{}.register_module("name.with.dot", torch::nn::Linear(3, 4)),
+      "Submodule name must not contain a dot (got 'name.with.dot')");
+  ASSERT_THROWS_WITH(
+      TestModel{}.register_module("", torch::nn::Linear(3, 4)),
+      "Submodule name must not be empty");
+}
+
+TEST_F(ModuleTest, RegisterModuleThrowsForDuplicateModuleName) {
+  struct TestModel : public torch::nn::Module {
+    using torch::nn::Module::register_module;
+  };
+  TestModel model;
+  model.register_module("linear", torch::nn::Linear(3, 4));
+  ASSERT_THROWS_WITH(
+      model.register_module("linear", torch::nn::Linear(3, 4)),
+      "Submodule 'linear' already defined");
+}
+
+TEST_F(ModuleTest, RegisterParameterThrowsForEmptyOrDottedName) {
+  struct TestModel : public torch::nn::Module {
+    using torch::nn::Module::register_parameter;
+  };
+  ASSERT_THROWS_WITH(
+      TestModel{}.register_parameter("name.with.dot", torch::ones(5)),
+      "Parameter name must not contain a dot (got 'name.with.dot')");
+  ASSERT_THROWS_WITH(
+      TestModel{}.register_parameter("", torch::ones(5)),
+      "Parameter name must not be empty");
+}
+
+TEST_F(ModuleTest, RegisterParameterThrowsForDuplicateModuleName) {
+  struct TestModel : public torch::nn::Module {
+    using torch::nn::Module::register_parameter;
+  };
+  TestModel model;
+  model.register_parameter("p", torch::ones(5));
+  ASSERT_THROWS_WITH(
+      model.register_parameter("p", torch::ones(5)),
+      "Parameter 'p' already defined");
+}
+
+TEST_F(ModuleTest, RegisterBufferThrowsForEmptyOrDottedName) {
+  struct TestModel : public torch::nn::Module {
+    using torch::nn::Module::register_buffer;
+  };
+  ASSERT_THROWS_WITH(
+      TestModel{}.register_buffer("name.with.dot", torch::ones(5)),
+      "Buffer name must not contain a dot (got 'name.with.dot')");
+  ASSERT_THROWS_WITH(
+      TestModel{}.register_buffer("", torch::ones(5)),
+      "Buffer name must not be empty");
+}
+
+TEST_F(ModuleTest, RegisterBufferThrowsForDuplicateModuleName) {
+  struct TestModel : public torch::nn::Module {
+    using torch::nn::Module::register_buffer;
+  };
+  TestModel model;
+  model.register_buffer("p", torch::ones(5));
+  ASSERT_THROWS_WITH(
+      model.register_buffer("p", torch::ones(5)), "Buffer 'p' already defined");
 }
 
 TEST_F(ModuleTest, CanGetName) {
@@ -126,7 +194,7 @@ TEST_F(ModuleTest, Conversion_MultiCUDA) {
       ASSERT_EQ(parameter->device().type(), torch::Device::Type::CUDA);
       ASSERT_EQ(parameter->device().index(), 0);
     }
-    module->to({at::kCUDA, 1});
+    module->to({torch::kCUDA, 1});
     for (auto& parameter : module->parameters()) {
       ASSERT_EQ(parameter->device().type(), torch::Device::Type::CUDA);
       ASSERT_EQ(parameter->device().index(), 1);
@@ -171,7 +239,7 @@ TEST_F(ModuleTest, CallingCloneOnModuleThatDoesNotOverrideCloneThrows) {
 TEST_F(ModuleTest, CallingCloneOnModuleThatDoesOverrideCloneDoesNotThrow) {
   struct Cloneable : Module {
     std::shared_ptr<Module> clone(
-        c10::optional<torch::Device> device = c10::nullopt) const override {
+        torch::optional<torch::Device> device = torch::nullopt) const override {
       return nullptr;
     }
   };

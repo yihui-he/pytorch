@@ -1,7 +1,11 @@
 #pragma once
 
+#include <torch/detail/static.h>
+#include <torch/types.h>
+
+#include <torch/csrc/python_headers.h>
 #include <torch/csrc/utils/pybind.h>
-#include <torch/tensor.h>
+#include <torch/types.h>
 
 #include <iterator>
 #include <string>
@@ -87,7 +91,8 @@ py::class_<M, Extra...> add_module_bindings(py::class_<M, Extra...> module) {
 ///
 /// Example usage:
 /// \rst
-/// .. code-block::
+/// .. code-block:: cpp
+///
 ///   struct Net : torch::nn::Module {
 ///     Net(int in, int out) { }
 ///     torch::Tensor forward(torch::Tensor x) { return x; }

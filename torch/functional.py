@@ -4,6 +4,7 @@ from torch._six import inf
 from operator import mul
 from functools import reduce
 import math
+import warnings
 
 __all__ = [
     'argmax',
@@ -19,6 +20,7 @@ __all__ = [
     'isnan',
     'norm',
     'meshgrid',
+    'potrf',
     'split',
     'stft',
     'tensordot',
@@ -254,11 +256,18 @@ def isfinite(tensor):
 
     Example::
 
-        >>> torch.isfinite(torch.Tensor([1, float('inf'), 2, float('-inf'), float('nan')]))
+        >>> torch.isfinite(torch.tensor([1, float('inf'), 2, float('-inf'), float('nan')]))
         tensor([ 1,  0,  1,  0,  0], dtype=torch.uint8)
     """
     if not isinstance(tensor, torch.Tensor):
         raise ValueError("The argument is not a tensor", str(tensor))
+
+    # Support int input, nan and inf are concepts in floating point numbers.
+    # Numpy uses type 'Object' when the int overflows long, but we don't
+    # have a similar concept. It's safe to assume any created LongTensor doesn't
+    # overflow and it's finite.
+    if not tensor.is_floating_point():
+        return torch.ones_like(tensor, dtype=torch.uint8)
     return (tensor == tensor) & (tensor.abs() != inf)
 
 
@@ -273,7 +282,7 @@ def isinf(tensor):
 
     Example::
 
-        >>> torch.isinf(torch.Tensor([1, float('inf'), 2, float('-inf'), float('nan')]))
+        >>> torch.isinf(torch.tensor([1, float('inf'), 2, float('-inf'), float('nan')]))
         tensor([ 0,  1,  0,  1,  0], dtype=torch.uint8)
     """
     if not isinstance(tensor, torch.Tensor):
@@ -754,3 +763,20 @@ def chain_matmul(*matrices):
     .. _`[CLRS]`: https://mitpress.mit.edu/books/introduction-algorithms-third-edition
     """
     return torch._C._VariableFunctions.chain_matmul(matrices)
+
+
+def potrf(a, upper=True, out=None):
+    r"""Computes the Cholesky decomposition of a symmetric positive-definite
+    matrix :math:`A`.
+
+    For more information, regarding :func:`torch.potrf`, please check :func:`torch.cholesky`.
+
+    .. warning::
+        torch.potrf is deprecated in favour of torch.cholesky and will be removed in the next
+        release. Please use torch.cholesky instead and note that the :attr:`upper` argument in
+        torch.cholesky defaults to ``False``.
+    """
+    warnings.warn("torch.potrf is deprecated in favour of torch.cholesky and will be removed in the next "
+                  "release. Please use torch.cholesky instead and note that the :attr:`upper` argument in"
+                  " torch.cholesky defaults to ``False``.", stacklevel=2)
+    return torch.cholesky(a, upper=upper, out=out)

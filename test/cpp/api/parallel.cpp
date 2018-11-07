@@ -5,7 +5,7 @@
 #include <torch/nn/modules/linear.h>
 #include <torch/nn/parallel/data_parallel.h>
 #include <torch/nn/pimpl.h>
-#include <torch/tensor.h>
+#include <torch/types.h>
 
 #include <test/cpp/api/support.h>
 
@@ -44,8 +44,8 @@ TEST_F(ParallelTest, DifferentiableScatter_MultiCUDA) {
 TEST_F(ParallelTest, DifferentiableGather_MultiCUDA) {
   Gather gather(torch::Device(torch::kCUDA, 1));
 
-  auto a = torch::ones(5, torch::requires_grad(true).device({torch::kCUDA, 0}));
-  auto b = torch::ones(5, torch::requires_grad(true).device({torch::kCUDA, 1}));
+  auto a = torch::ones(5, torch::requires_grad(true).device(torch::kCUDA, 0));
+  auto b = torch::ones(5, torch::requires_grad(true).device(torch::kCUDA, 1));
 
   auto outputs = gather.apply({a, b});
   ASSERT_EQ(outputs.size(), 1);
@@ -189,7 +189,7 @@ TEST_F(
     auto output = parallel::data_parallel(
         m,
         input,
-        /*devices=*/c10::nullopt,
+        /*devices=*/torch::nullopt,
         /*output_device=*/torch::Device(torch::kCUDA, 1));
     ASSERT_TRUE(output.defined());
     ASSERT_TRUE(output.device().is_cuda());

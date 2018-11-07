@@ -402,7 +402,7 @@ void addObjectMethods(py::module& m) {
             // be, since we're doing an extra allocation we didn't
             // need to do.  But I don't remember how to clue in
             // pybind11 how to convert ArrayRef to vector.
-            return tensor->dims().vec();
+            return tensor->sizes().vec();
           })
       .def(
           "_reshape",
@@ -415,7 +415,7 @@ void addObjectMethods(py::module& m) {
       .def_property_readonly(
           "data",
           [](TensorCPU* t) -> py::object {
-            if (t->meta() == TypeMeta{}) {
+            if (t->dtype() == TypeMeta{}) {
               // keep this behavior for backward compatibility
               t->mutable_data<float>();
             }
@@ -460,7 +460,7 @@ void addObjectMethods(py::module& m) {
           "Initialize this tensor to given shape and data type. "
           "Fail if the given data type cannot be accessed from python.")
       .def_property_readonly(
-          "_shape", [](const TensorCPU& t) { return t.dims().vec(); })
+          "_shape", [](const TensorCPU& t) { return t.sizes().vec(); })
       .def("_reshape", [](TensorCPU* t, std::vector<int64_t> dims) {
         t->Resize(dims);
       });
@@ -586,7 +586,8 @@ void addObjectMethods(py::module& m) {
         const auto& meta = GetGradientForOp(def, output_gradients);
         std::vector<py::bytes> grad_ops;
         for (const auto& op : meta.ops_) {
-          grad_ops.push_back(op.SerializeAsString());
+          grad_ops.push_back(
+            SerializeAsString_EnforceCheck(op, "addObjectMethods"));
         }
         return std::pair<std::vector<py::bytes>, std::vector<GradientWrapper>>{
             grad_ops, meta.g_input_};
@@ -976,12 +977,12 @@ void addGlobalMethods(py::module& m) {
   // keep this Python attribute for BC
   m.attr("has_mkldnn") = py::bool_(false);
 
-  m.attr("use_ideep") = py::bool_(
-#ifdef CAFFE2_USE_IDEEP
+  m.attr("use_mkldnn") = py::bool_(
+#ifdef CAFFE2_USE_MKLDNN
       true
-#else // CAFFE2_USE_IDEEP
+#else // CAFFE2_USE_MKLDNN
       false
-#endif // CAFFE2_USE_IDEEP
+#endif // CAFFE2_USE_MKLDNN
       );
 
   m.attr("use_trt") = py::bool_(
@@ -1217,17 +1218,10 @@ void addGlobalMethods(py::module& m) {
     return true;
   });
   m.def("nets", []() { return gWorkspace->Nets(); });
-  m.def("run_operator_once", [](const py::bytes& op_def, bool legacy_proto=true) {
+  m.def("run_operator_once", [](const py::bytes& op_def) {
     CAFFE_ENFORCE(gWorkspace);
     OperatorDef def;
-    if (legacy_proto) {
-      CAFFE_ENFORCE(ParseProtoFromLargeString(op_def.cast<std::string>(), &def));
-    } else {
-      ::torch::NodeProto node;
-      CAFFE_ENFORCE(
-          ParseProtoFromLargeString(op_def.cast<std::string>(), &node));
-      NodeProtoToOperatorDef(node, &def);
-    }
+    CAFFE_ENFORCE(ParseProtoFromLargeString(op_def.cast<std::string>(), &def));
     py::gil_scoped_release g;
     CAFFE_ENFORCE(gWorkspace->RunOperatorOnce(def));
     return true;
@@ -1568,38 +1562,6 @@ void addGlobalMethods(py::module& m) {
     CAFFE_ENFORCE(blob);
     return BlobStat::sizeBytes(*blob);
   });
-  m.def("argument_to_attribute_proto", [](py::bytes arg_str) -> py::bytes {
-    Argument arg;
-    CAFFE_ENFORCE(
-      ParseProtoFromLargeString(arg_str.cast<std::string>(), &arg));
-    ::torch::AttributeProto attr;
-    ArgumentToAttributeProto(arg, &attr);
-    return attr.SerializeAsString();
-  });
-  m.def("attribute_proto_to_argument", [](py::bytes attr_str) -> py::bytes {
-    ::torch::AttributeProto attr;
-    CAFFE_ENFORCE(
-      ParseProtoFromLargeString(attr_str.cast<std::string>(), &attr));
-    Argument arg;
-    AttributeProtoToArgument(attr, &arg);
-    return arg.SerializeAsString();
-  });
-  m.def("operator_def_to_node_proto", [](py::bytes op_str) -> py::bytes {
-    OperatorDef op_def;
-    CAFFE_ENFORCE(
-      ParseProtoFromLargeString(op_str.cast<std::string>(), &op_def));
-    ::torch::NodeProto node;
-    OperatorDefToNodeProto(op_def, &node);
-    return node.SerializeAsString();
-  });
-  m.def("node_proto_to_operator_def", [](py::bytes node_str) -> py::bytes {
-    ::torch::NodeProto node_proto;
-    CAFFE_ENFORCE(
-      ParseProtoFromLargeString(node_str.cast<std::string>(), &node_proto));
-    OperatorDef op_def;
-    NodeProtoToOperatorDef(node_proto, &op_def);
-    return op_def.SerializeAsString();
-  });
   m.def("support_onnx_export", [](const std::string& op) -> bool {
     const OpSchema* schema = caffe2::OpSchemaRegistry::Schema(op);
     if (!schema) {
@@ -1672,7 +1634,9 @@ void addGlobalMethods(py::module& m) {
   m.def(
       "onnxifi",
       [](const py::bytes& pred_net_str,
+         const std::vector<std::string>& external_inputs,
          const std::unordered_map<std::string, std::vector<int>>& shapes,
+         bool infer_shapes,
          bool debug_builder) -> py::bytes {
         caffe2::NetDef pred_net;
         CAFFE_ENFORCE(
@@ -1684,8 +1648,9 @@ void addGlobalMethods(py::module& m) {
           tensor_shapes.emplace(
               it.first, CreateTensorShape(it.second, TensorProto::FLOAT));
         }
-        OnnxifiTransformer ts(debug_builder);
-        ts.Transform(GetCurrentWorkspace(), &pred_net, tensor_shapes);
+        OnnxifiTransformer ts(infer_shapes, debug_builder);
+        ts.Transform(
+            GetCurrentWorkspace(), &pred_net, external_inputs, tensor_shapes);
         std::string pred_net_str2;
         pred_net.SerializeToString(&pred_net_str2);
         return py::bytes(pred_net_str2);
